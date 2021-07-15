@@ -1064,7 +1064,12 @@ func dnsBinaryTruncate(resp *dns.Msg, maxSize int, index map[string]dns.RR, hasE
 			}
 			startIndex = median
 		} else {
-			endIndex = median
+			// first try to remove the NS section may be it will truncate enough
+			if len(resp.Ns) != 0 {
+				resp.Ns = []dns.RR{}
+			} else {
+				endIndex = median
+			}
 		}
 	}
 	return startIndex

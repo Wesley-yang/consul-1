@@ -4419,6 +4419,7 @@ func TestBinarySearch(t *testing.T) {
 		target := fmt.Sprintf("host-redis-%d-%d.test.acme.com.node.dc1.consul.", i/256, i%256)
 		msgSrc.Answer = append(msgSrc.Answer, &dns.SRV{Hdr: dns.RR_Header{Name: "redis.service.consul.", Class: 1, Rrtype: dns.TypeSRV, Ttl: 0x3c}, Port: 0x4c57, Target: target})
 		msgSrc.Extra = append(msgSrc.Extra, &dns.CNAME{Hdr: dns.RR_Header{Name: target, Class: 1, Rrtype: dns.TypeCNAME, Ttl: 0x3c}, Target: fmt.Sprintf("fx.168.%d.%d.", i/256, i%256)})
+		msgSrc.Ns = append(msgSrc.Ns, &dns.SOA{Hdr: dns.RR_Header{Name: target, Class: 1, Rrtype: dns.TypeSOA, Ttl: 0x3c}})
 	}
 	for _, compress := range []bool{true, false} {
 		for idx, maxSize := range []int{12, 256, 512, 8192, 65535} {
@@ -4428,9 +4429,12 @@ func TestBinarySearch(t *testing.T) {
 				msgSrc.SetQuestion("redis.service.consul.", dns.TypeSRV)
 				msg.Answer = msgSrc.Answer
 				msg.Extra = msgSrc.Extra
+				msg.Ns = msgSrc.Ns
 				index := make(map[string]dns.RR, len(msg.Extra))
 				indexRRs(msg.Extra, index)
+				lenAnswer := len(msg.Answer)
 				blen := dnsBinaryTruncate(msg, maxSize, index, true)
+
 				msg.Answer = msg.Answer[:blen]
 				syncExtra(index, msg)
 				predicted := msg.Len()
@@ -4443,6 +4447,9 @@ func TestBinarySearch(t *testing.T) {
 				}
 				if len(buf) > maxSize || (idx != 0 && len(buf) < 16) {
 					t.Fatalf("bad[%d]: %d > %d", idx, len(buf), maxSize)
+				}
+				if blen != lenAnswer-1 && len(msg.Ns) != 0 {
+					t.Fatalf("NS should be truncated first")
 				}
 			})
 		}
